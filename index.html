@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cure Portal</title>
+    <script src="https://apis.google.com/js/api.js"></script>
+    <style>
+        /* Modern aesthetic color palette */
+        :root {
+            --primary-color: #2a2d3e;
+            --secondary-color: #4a4e69;
+            --accent-color: #7676c7;
+            --text-color: #ffffff;
+            --overlay-color: rgba(0, 0, 0, 0.7);
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            min-height: 100vh;
+            color: var(--text-color);
+        }
+
+        .background {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-size: 3in 3in;
+            background-repeat: repeat;
+            z-index: -1;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: var(--overlay-color);
+            min-height: 100vh;
+        }
+
+        .login-form, .mode-selection, .dashboard {
+            background-color: rgba(42, 45, 62, 0.9);
+            padding: 30px;
+            border-radius: 15px;
+            margin: 20px auto;
+            max-width: 400px;
+        }
+
+        input, button, select {
+            width: 100%;
+            padding: 12px;
+            margin: 10px 0;
+            border: none;
+            border-radius: 5px;
+            background-color: var(--secondary-color);
+            color: var(--text-color);
+        }
+
+        button {
+            background-color: var(--accent-color);
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+
+        button:hover {
+            background-color: #5959a6;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 20px;
+            background-color: var(--secondary-color);
+            border-radius: 10px;
+            overflow: hidden;
+            margin: 10px 0;
+        }
+
+        .progress {
+            height: 100%;
+            background: linear-gradient(90deg, #7676c7, #9f9fe0);
+            transition: width 0.5s;
+        }
+
+        .hidden {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="background"></div>
+    <div class="container">
+        <!-- Login Form -->
+        <div id="loginForm" class="login-form">
+            <h2>Login</h2>
+            <input type="text" id="roll" placeholder="Enter Roll Number" required>
+            <input type="password" id="password" placeholder="Enter Password" required>
+            <button onclick="validateLogin()">Submit</button>
+        </div>
+
+        <!-- Mode Selection -->
+        <div id="modeSelection" class="mode-selection hidden">
+            <h2>Select Mode</h2>
+            <select id="mode" onchange="selectMode()">
+                <option value="">Choose your mode</option>
+                <option value="natural">Natural</option>
+                <option value="bts">BTS</option>
+                <option value="villain">Villain</option>
+                <option value="islamic">Islamic</option>
+            </select>
+        </div>
+
+        <!-- Dashboard -->
+        <div id="dashboard" class="dashboard hidden">
+            <h2 id="welcomeMessage"></h2>
+            <div id="levelInfo">
+                <h3>Level: <span id="levelName"></span></h3>
+                <div class="progress-bar">
+                    <div id="progressBar" class="progress"></div>
+                </div>
+            </div>
+            <h3>Cure Coins: <span id="cureCoins"></span></h3>
+            <h3>Today's Task: <span id="task"></span></h3>
+            <button id="examButton" onclick="redirectToExam()">Today's Exam</button>
+            <h3>Message from Curator: <span id="curatorMessage"></span></h3>
+            <h3>Your Challenge: <span id="challenge"></span></h3>
+            <h3>Your Course: <span id="course"></span></h3>
+            <iframe width="100%" height="315" src="https://www.youtube.com/embed/y5wRLyi-r2Q" frameborder="0" allowfullscreen></iframe>
+        </div>
+    </div>
+
+    <audio id="bgMusic" loop>
+        <source src="" type="audio/mpeg">
+    </audio>
+
+    <script>
+        // Google Sheets API configuration
+        const API_KEY = 'AIzaSyDC_aqgXAhScsYg85qTTs1fQcUtgn2Z2xQ';
+        const SHEET_ID = '1au47L1JRddLxC89GiFCzUfAPzVfMpWcoirXc9coZLfw';
+        let userData = null;
+
+        // Initialize Google Sheets API
+        function initGoogleSheetsAPI() {
+            gapi.client.init({
+                apiKey: API_KEY,
+                discoveryDocs: ["https://sheets.googleapis.com/$discovery/rest?version=v4"],
+            }).then(() => {
+                console.log('Google Sheets API initialized');
+            });
+        }
+        gapi.load('client', initGoogleSheetsAPI);
+
+        // Validate login
+        async function validateLogin() {
+            const roll = document.getElementById('roll').value;
+            const password = document.getElementById('password').value;
+
+            // Fetch data from Google Sheets
+            try {
+                const response = await gapi.client.sheets.spreadsheets.values.get({
+                    spreadsheetId: SHEET_ID,
+                    range: 'Sheet1!A2:H',
+                });
+
+                const rows = response.result.values;
+                const user = rows.find(row => row[1] === roll && row[2] === password);
+
+                if (user) {
+                    userData = {
+                        name: user[0],
+                        roll: user[1],
+                        cureCoins: parseInt(user[3]),
+                        task: user[4],
+                        message: user[5],
+                        challenge: user[6],
+                        course: user[7]
+                    };
+                    showModeSelection();
+                } else {
+                    alert('Invalid credentials!');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Error accessing data!');
+            }
+        }
+
+        // Show mode selection
+        function showModeSelection() {
+            document.getElementById('loginForm').classList.add('hidden');
+            document.getElementById('modeSelection').classList.remove('hidden');
+        }
+
+        // Mode selection handler
+        function selectMode() {
+            const mode = document.getElementById('mode').value;
+            if (mode) {
+                setTheme(mode);
+                showDashboard(mode);
+            }
+        }
+
+        // Set theme based on mode
+        function setTheme(mode) {
+            const themeMap = {
+                natural: { bg: '98.jpg', music: '98.mp3' },
+                bts: { bg: '97.jpg', music: '97.mp3' },
+                villain: { bg: '96.jpg', music: '96.mp3' },
+                islamic: { bg: '95.jpg', music: '95.mp3' }
+            };
+
+            const theme = themeMap[mode];
+            document.querySelector('.background').style.backgroundImage = `url(${theme.bg})`;
+            const audio = document.getElementById('bgMusic');
+            audio.src = theme.music;
+            audio.play();
+        }
+// Continuing from the previous code...
+
+        // Get level name based on mode and cure coins
+        function getLevelName(mode, coins) {
+            const levels = {
+                natural: ['c', 'cc', 'ccc', 'cccc', 'ccccc', 'cccccc', 'ccccccc'],
+                bts: ['b', 'bb', 'bbb', 'bbbb', 'bbbbb', 'bbbbbb', 'bbbbbbb'],
+                villain: ['d', 'dd', 'ddd', 'dddd', 'ddddd', 'dddddd', 'ddddddd'],
+                islamic: ['m', 'mm', 'mmm', 'mmmm', 'mmmmm', 'mmmmmm', 'mmmmmmm']
+            };
+
+            let levelIndex;
+            if (coins <= 100) levelIndex = 0;
+            else if (coins <= 250) levelIndex = 1;
+            else if (coins <= 500) levelIndex = 2;
+            else if (coins <= 1000) levelIndex = 3;
+            else if (coins <= 2500) levelIndex = 4;
+            else if (coins <= 7000) levelIndex = 5;
+            else levelIndex = 6;
+
+            return levels[mode][levelIndex];
+        }
+
+        // Calculate progress percentage for progress bar
+        function calculateProgress(coins) {
+            const levels = [0, 100, 250, 500, 1000, 2500, 7000, 20000];
+            let currentLevel = 0;
+            
+            for (let i = 1; i < levels.length; i++) {
+                if (coins <= levels[i]) {
+                    currentLevel = i - 1;
+                    break;
+                }
+            }
+            
+            const rangeMin = levels[currentLevel];
+            const rangeMax = levels[currentLevel + 1];
+            const progress = ((coins - rangeMin) / (rangeMax - rangeMin)) * 100;
+            return Math.min(Math.max(progress, 0), 100);
+        }
+
+        // Show dashboard
+        function showDashboard(mode) {
+            document.getElementById('modeSelection').classList.add('hidden');
+            document.getElementById('dashboard').classList.remove('hidden');
+
+            // Update dashboard content
+            document.getElementById('welcomeMessage').textContent = `Hello ${userData.name}`;
+            document.getElementById('levelName').textContent = getLevelName(mode, userData.cureCoins);
+            document.getElementById('cureCoins').textContent = userData.cureCoins;
+            document.getElementById('task').textContent = userData.task;
+            document.getElementById('curatorMessage').textContent = userData.message;
+            document.getElementById('challenge').textContent = userData.challenge;
+            document.getElementById('course').textContent = userData.course;
+
+            // Update progress bar
+            const progress = calculateProgress(userData.cureCoins);
+            document.getElementById('progressBar').style.width = `${progress}%`;
+        }
+
+        // Redirect to exam based on roll number
+        function redirectToExam() {
+            const roll = parseInt(userData.roll);
+            if (roll >= 0 && roll <= 1000) {
+                window.location.href = 'x.com';
+            } else if (roll >= 1001 && roll <= 2000) {
+                window.location.href = 'y.com';
+            }
+        }
+
+        // Handle page visibility change to control music
+        document.addEventListener('visibilitychange', () => {
+            const audio = document.getElementById('bgMusic');
+            if (document.hidden) {
+                audio.pause();
+            } else {
+                if (document.getElementById('dashboard').classList.contains('hidden')) {
+                    audio.play();
+                }
+            }
+        });
+
+        // Cleanup when leaving the page
+        window.addEventListener('beforeunload', () => {
+            const audio = document.getElementById('bgMusic');
+            audio.pause();
+            audio.currentTime = 0;
+        });
+    </script>
+</body>
+</html>
